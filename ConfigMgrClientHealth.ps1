@@ -3547,5 +3547,5 @@ End {
         Write-Host 'Updating SQL database with results using webservice'
         Update-Webservice -URI $Webservice -Log $Log
     }
-    Write-Verbose "Client Health script finished"
+    Write-Host "Client Health script finished"
 }
