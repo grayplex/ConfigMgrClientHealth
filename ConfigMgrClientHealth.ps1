@@ -380,7 +380,7 @@ Begin {
     }
 
     Function Out-LogFile {
-        Param([Parameter(Mandatory = $false)][xml]$Xml, $Text, $Mode,
+        Param($Text, $Mode,
             [Parameter(Mandatory = $false)][ValidateSet(1, 2, 3, 'Information', 'Warning', 'Error')]$Severity = 1)
 
         switch ($Severity) {
@@ -389,7 +389,7 @@ Begin {
             'Error' {$Severity = 3}
         }
 
-        if ($Mode -like "Local") {
+        if ($LocalLogging -or ($Mode -like "Local")) {
             Test-LocalLogging
             $clientpath = Get-LocalFilesPath
             $Logfile = "$clientpath\ClientHealth.log"
@@ -1020,15 +1020,15 @@ Begin {
                     Write-Host $text
                     $log.DNS = $logFail
                     if (-NOT($FileLogLevel -like "clientlocal")) {
-                        Out-LogFile -Xml $xml -Text $text -Severity 2
-                        Out-LogFile -Xml $xml -Text $dnsFail -Severity 2
+                        Out-LogFile -Text $text -Severity 2
+                        Out-LogFile -Text $dnsFail -Severity 2
                     }
 
                 }
                 else {
                     $text = 'DNS Check: FAILED. IP address published in DNS do not match IP address on local machine. Monitor mode only, no remediation'
                     $log.DNS = $logFail
-                    if (-NOT($FileLogLevel -like "clientlocal")) { Out-LogFile -Xml $xml -Text $text  -Severity 2}
+                    if (-NOT($FileLogLevel -like "clientlocal")) { Out-LogFile -Text $text  -Severity 2 }
                     Write-Host $text
                 }
 
@@ -1392,7 +1392,7 @@ Begin {
                 Write-Host $text
                 $log.PendingReboot = 'OK'
             }
-            #Out-LogFile -Xml $xml -Text $text
+            #Out-LogFile -Text $text
         }
     }
 
@@ -1721,7 +1721,7 @@ Begin {
                 Write-Verbose "returning true to tag client for reinstall"
                 $obj = $true
             }
-            #Out-LogFile -Xml $xml -Text $text
+            #Out-LogFile -Text $text
             Write-Output $obj
         }
     }
@@ -2196,7 +2196,7 @@ Begin {
             foreach ($device in $devices) {
                 $text = 'Missing or faulty driver: ' +$device.Name + '. Device ID: ' + $device.DeviceID
                 Write-Warning $text
-                if (-NOT($FileLogLevel -like "clientlocal")) { Out-LogFile -Xml $xml -Text $text -Severity 2}
+                if (-NOT($FileLogLevel -like "clientlocal")) { Out-LogFile -Text $text -Severity 2}
             }
         }
         else {
@@ -2391,7 +2391,7 @@ Begin {
     Function Get-Version {
         $text = 'ConfigMgr Client Health Version ' +$Version
         Write-Host $text
-        Out-LogFile -Xml $xml -Text $text -Severity 1
+        Out-LogFile -Text $text -Severity 1
     }
 
     <# Trigger codes
@@ -2465,7 +2465,7 @@ Begin {
         catch {
             $text = "Error connecting to SQLDatabase $Database on SQL Server $SQLServer"
             Write-Error -Message $text
-            if (-NOT($FileLogLevel -like "clientinstall")) { Out-LogFile -Xml $xml -Text $text -Severity 3}
+            if (-NOT($FileLogLevel -like "clientinstall")) { Out-LogFile -Text $text -Severity 3}
             $obj = $false;
             Write-Verbose "SQL connection test failed"
         }
@@ -2941,28 +2941,28 @@ Begin {
         #$text = 'Computer info'+ "`n"
         $text = 'Hostname: ' +$info.HostName
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'Operatingsystem: ' +$info.OperatingSystem
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'Architecture: ' + $info.Architecture
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'Build: ' + $info.Build
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'Manufacturer: ' + $info.Manufacturer
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'Model: ' + $info.Model
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'InstallDate: ' + $info.InstallDate
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
         $text = 'LastLoggedOnUser: ' + $info.LastLoggedOnUser
         Write-Host $text
-        #Out-LogFile -Xml $xml $text
+        #Out-LogFile $text
     }
 
     Function Test-ConfigMgrHealthLogging {
@@ -3195,7 +3195,7 @@ Begin {
             $ErrorMessage = $_.Exception.Message
             $text = "Error updating SQL with the following query: $query. Error: $ErrorMessage"
             Write-Error $text
-            Out-LogFile -Xml $Xml -Text "ERROR Insert/Update SQL. SQL Query: $query `nSQL Error: $ErrorMessage" -Severity 3
+            Out-LogFile -Text "ERROR Insert/Update SQL. SQL Query: $query `nSQL Error: $ErrorMessage" -Severity 3
         }
         Write-Verbose "End Update-SQL"
     }
@@ -3217,7 +3217,7 @@ Begin {
         $text = $text.replace(" :",":")
         $text = $text -creplace '(?m)^\s*\r?\n',''
 
-        Out-LogFile -Xml $xml -Text $text -Mode $Mode -Severity 1
+        Out-LogFile -Text $text -Mode $Mode -Severity 1
         Write-Verbose "End Update-LogFile"
     }
 
@@ -3270,7 +3270,7 @@ Process {
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator"))
     {
         $text = 'ERROR: Powershell not running as Administrator! Client Health aborting.'
-        Out-LogFile -Xml $Xml -Text $text -Severity 3
+        Out-LogFile -Text $text -Severity 3
         Write-Error $text
         Exit 1
     }
