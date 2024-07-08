@@ -436,6 +436,15 @@ Begin {
                 19042 { $OSName = $OSName + ' 20H2' }
                 19043 { $OSName = $OSName + ' 21H1' }
                 19044 { $OSName = $OSName + ' 21H2' }
+                19045 { $OSName = $OSName + ' 22H2' }
+                default { $OSName = $OSName + ' Insider Preview' }
+            }
+        } elseif ($OSName -like '*Windows 11*') {
+            $build = Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber
+            switch ($build) {
+                22000 { $OSName = $OSName + ' 21H2' }
+                22621 { $OSName = $OSName + ' 22H2' }
+                22631 { $OSName = $OSName + ' 23H2' }
                 default { $OSName = $OSName + ' Insider Preview' }
             }
         }
@@ -1080,11 +1089,15 @@ Begin {
                 19042 { $OSName = $OSName + ' 20H2' }
                 19043 { $OSName = $OSName + ' 21H1' }
                 19044 { $OSName = $OSName + ' 21H2' }
+                19045 { $OSName = $OSName + ' 22H2' }
                 default { $OSName = $OSName + ' Insider Preview' }
             }
         } elseif ($OSName -like "*Windows 11*") {
             $build = Get-CimInstance Win32_OperatingSystem | Select-Object -ExpandProperty BuildNumber
             switch ($build) {
+                22000 { $OSName = $OSName + ' 21H2' }
+                22621 { $OSName = $OSName + ' 22H2' }
+                22631 { $OSName = $OSName + ' 23H2' }
                 default { $OSName = $OSName + " Insider Preview" }
             }
         }
