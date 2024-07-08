@@ -3250,6 +3250,11 @@ Begin {
         $ClientStateMessages = Get-XMLConfigRemediationClientStateMessages
         $ClientWUAHandler = Get-XMLConfigRemediationClientWUAHandler
         $LogShare = Get-XMLConfigLoggingShare
+
+        $LocalLogging = ((Get-XMLConfigLoggingLocalFile).ToString()).ToLower()
+        $FileLogging = ((Get-XMLConfigLoggingEnable).ToString()).ToLower()
+        $FileLogLevel = ((Get-XMLConfigLoggingLevel).ToString()).ToLower()
+        $SQLLogging = ((Get-XMLConfigSQLLoggingEnable).ToString()).ToLower()
     }
 
     # Create a DataTable to store all changes to log files to be processed later. This to prevent false positives to remediate the next time script runs if error is already remediated.
@@ -3291,12 +3296,6 @@ Process {
          }
     }
 
-
-    # If config.xml is used
-    $LocalLogging = ((Get-XMLConfigLoggingLocalFile).ToString()).ToLower()
-    $FileLogging = ((Get-XMLConfigLoggingEnable).ToString()).ToLower()
-    $FileLogLevel = ((Get-XMLConfigLoggingLevel).ToString()).ToLower()
-    $SQLLogging = ((Get-XMLConfigSQLLoggingEnable).ToString()).ToLower()
 
 
     $RegistryKey = "HKLM:\Software\ConfigMgrClientHealth"
