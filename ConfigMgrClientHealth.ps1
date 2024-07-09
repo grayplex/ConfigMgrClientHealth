@@ -64,6 +64,44 @@ Begin {
     Write-Verbose "Script version: $Version"
     Write-Verbose "PowerShell version: $PowerShellVersion"
 
+     #region proxy functions for logging
+    $WriteHostMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Host)	    # #Write-Verbose
+    $WriteHostBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteHostMetadata)	    # $WriteVerboseMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Verbose)
+    $WriteHostParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteHostMetadata)	    # $WriteVerboseBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteVerboseMetadata)
+    $WriteHostWrapped = {Microsoft.Powershell.Utility\Write-Host @PSBoundParameters; Out-LogFile -Text $Object}	    # $WriteVerboseParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteVerboseMetadata)
+    ${Function:Write-Host} = '{0}param({1}) {2}' -f $WriteHostBinding, $WriteHostParams, $WriteHostWrapped	    # $WriteVerboseWrapped = {Microsoft.Powershell.Utility\Write-Verbose @PSBoundParameters; Out-LogFile -Text $Message}
+    # ${Function:Write-Verbose} = '{0}param({1}) {2}' -f $WriteVerboseBinding, $WriteVerboseParams, $WriteVerboseWrapped
+
+    #Write-Host
+    $WriteHostMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Host)
+    $WriteHostBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteHostMetadata)
+    $WriteHostParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteHostMetadata)
+    $WriteHostWrapped = {Microsoft.Powershell.Utility\Write-Host @PSBoundParameters; Out-LogFile -Text $Object}
+    ${Function:Write-Host} = '{0}param({1}) {2}' -f $WriteHostBinding, $WriteHostParams, $WriteHostWrapped
+
+    # #Write-Information
+    # $WriteInformationMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Information)
+    # $WriteInformationBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteInformationMetadata)
+    # $WriteInformationParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteInformationMetadata)
+    # $WriteInformationWrapped = {Microsoft.Powershell.Utility\Write-Information @PSBoundParameters; Out-LogFile -Text $MessageData}
+    # ${Function:Write-Information} = '{0}param({1}) {2}' -f $WriteInformationBinding, $WriteInformationParams, $WriteInformationWrapped
+
+    #Write-Warning
+    $WriteWarningMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Warning)
+    $WriteWarningBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteWarningMetadata)
+    $WriteWarningParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteWarningMetadata)
+    $WriteWarningWrapped = {Microsoft.Powershell.Utility\Write-Warning @PSBoundParameters; Out-LogFile -Text "WARNING: $Message"}
+    ${Function:Write-Warning} = '{0}param({1}) {2}' -f $WriteWarningBinding, $WriteWarningParams, $WriteWarningWrapped
+
+    #Write-Error
+    $WriteErrorMetadata = New-Object System.Management.Automation.CommandMetadata (Get-Command Write-Error)
+    $WriteErrorBinding = [System.Management.Automation.ProxyCommand]::GetCmdletBindingAttribute($WriteErrorMetadata)
+    $WriteErrorParams = [System.Management.Automation.ProxyCommand]::GetParamBlock($WriteErrorMetadata)
+    $WriteErrorWrapped = {Microsoft.Powershell.Utility\Write-Error @PSBoundParameters; Out-LogFile -Text "ERROR: $Message"}
+    ${Function:Write-Error} = '{0}param({1}) {2}' -f $WriteErrorBinding, $WriteErrorParams, $WriteErrorWrapped
+
+    #endregion proxy functions for logging
+
     Function Test-XML {
         <#
         .SYNOPSIS
@@ -334,7 +372,7 @@ Begin {
     }
 
     Function Out-LogFile {
-        Param([Parameter(Mandatory = $false)][xml]$Xml, $Text, $Mode,
+        Param($Text, $Mode,
             [Parameter(Mandatory = $false)][ValidateSet(1, 2, 3, 'Information', 'Warning', 'Error')]$Severity = 1)
 
         switch ($Severity) {
@@ -343,7 +381,7 @@ Begin {
             'Error' { $Severity = 3 }
         }
 
-        if ($Mode -like 'Local') {
+        if ($LocalLogging -or ($Mode -like 'Local')) {
             Test-LocalLogging
             $clientpath = Get-LocalFilesPath
             $Logfile = "$clientpath\ClientHealth.log"
@@ -731,7 +769,7 @@ Begin {
 
         if ($ok -eq $true) {
             $text = 'ConfigMgr Client Certificate: OK'
-            Write-Output $text
+            Write-Host $text
             $log.ClientCertificate = 'OK'
         }
     }
@@ -1057,19 +1095,19 @@ Begin {
                     Write-Host $text
                     $log.DNS = $logFail
                     if (-NOT($FileLogLevel -like 'clientlocal')) {
-                        Out-LogFile -Xml $xml -Text $text -Severity 2
-                        Out-LogFile -Xml $xml -Text $dnsFail -Severity 2
+                        Out-LogFile -Text $text -Severity 2
+                        Out-LogFile -Text $dnsFail -Severity 2
                     }
                 } else {
                     $text = 'DNS Check: FAILED. IP address published in DNS do not match IP address on local machine. Monitor mode only, no remediation'
                     $log.DNS = $logFail
-                    if (-NOT($FileLogLevel -like 'clientlocal')) { Out-LogFile -Xml $xml -Text $text -Severity 2 }
+                    if (-NOT($FileLogLevel -like 'clientlocal')) { Out-LogFile -Text $text -Severity 2  }
                     Write-Host $text
                 }
             }
             $true {
                 $text = 'DNS Check: OK'
-                Write-Output $text
+                Write-Host $text
                 $log.DNS = 'OK'
             }
         }
@@ -1144,7 +1182,7 @@ Begin {
 
             if (($count -eq 0) -or ($null -eq $count)) {
                 $text = 'Updates: No mandatory updates to install.'
-                Write-Output $text
+                Write-Host $text
                 $log.Updates = 'No mandatory updates to install - OK'
             } else {
                 $logEntry = $null
@@ -1155,7 +1193,7 @@ Begin {
                     if ($installedUpdates -contains $kb) {
                         $text = "Update $hotfix" + ': OK'
                         $logEntry += "`nUpdate $kb" + ": OK"
-                        Write-Output $text
+                        Write-Host $text
                     } else {
                         if ($null -eq $logEntry) { $logEntry = $kb }
                         else { $logEntry += "`nTesting Update: $kb" }
@@ -1240,7 +1278,7 @@ Begin {
                     Write-Host 'ConfigMgr Agent not running. Attempting to start it.'
                     if ($CCMService.StartType -ne 'Automatic') {
                         $text = 'Configuring service CcmExec StartupType to: Automatic (Delayed Start)...'
-                        Write-Output $text
+                        Write-Host $text
                         Set-Service -Name CcmExec -StartupType Automatic
                     }
                     Start-Service -Name CcmExec
@@ -1347,7 +1385,7 @@ Begin {
 
         if ($installedVersion -ge $ClientVersion) {
             $text = 'ConfigMgr Client version is: ' + $installedVersion + ': OK'
-            Write-Output $text
+            Write-Host $text
             $obj = $false
         } elseif ($ClientAutoUpgrade -like 'true') {
             $text = 'ConfigMgr Client version is: ' + $installedVersion + ': Tagging client for upgrade to version: ' + $ClientVersion
@@ -1355,7 +1393,7 @@ Begin {
             $obj = $true
         } else {
             $text = 'ConfigMgr Client version is: ' + $installedVersion + ': Required version: ' + $ClientVersion + ' AutoUpgrade: false. Skipping upgrade'
-            Write-Output $text
+            Write-Host $text
             $obj = $false
         }
         Write-Output $obj
@@ -1428,10 +1466,10 @@ Begin {
                 }
             } else {
                 $text = 'Pending Reboot: OK'
-                Write-Output $text
+                Write-Host $text
                 $log.PendingReboot = 'OK'
             }
-            #Out-LogFile -Xml $xml -Text $text
+            #Out-LogFile -Text $text
         }
     }
 
@@ -1451,7 +1489,7 @@ Begin {
             $log.ProvisioningMode = 'Repaired'
         } else {
             $text = 'ConfigMgr Client Provisioning Mode: OK'
-            Write-Output $text
+            Write-Host $text
             $log.ProvisioningMode = 'OK'
         }
     }
@@ -1473,7 +1511,7 @@ Begin {
         if ($StateMessage -match 'Successfully forwarded State Messages to the MP') {
             $text = 'StateMessage: OK'
             $log.StateMessages = 'OK'
-            Write-Output $text
+            Write-Host $text
         } else {
             $text = 'StateMessage: ERROR. Remediating...'
             Write-Warning $text
@@ -1555,7 +1593,7 @@ Begin {
         #If we need to repart the policy files then do so.
         if ($RepairReason -ne '') {
             $log.WUAHandler = "Broken ($RepairReason)"
-            Write-Output "GPO Cache: Broken ($RepairReason)"
+            Write-Host "GPO Cache: Broken ($RepairReason)"
             Write-Verbose 'Deleting registry.pol and running gpupdate...'
 
             try { 
@@ -1574,10 +1612,10 @@ Begin {
             Get-SCCMPolicySourceUpdateMessage
 
             $log.WUAHandler = "Repaired ($RepairReason)"
-            Write-Output "GPO Cache: $($log.WUAHandler)"
+            Write-Host "GPO Cache: $($log.WUAHandler)"
         } else {
             $log.WUAHandler = 'OK'
-            Write-Output 'GPO Cache: OK'
+            Write-Host 'GPO Cache: OK'
         }
     }
 
@@ -1681,7 +1719,7 @@ Begin {
         if ((Test-Path $ClientShare -ErrorAction SilentlyContinue) -eq $true) {
             if ($FirstInstall -eq $true) { $text = 'Installing Configuration Manager Client.' }
             else { $text = 'Client tagged for reinstall. Reinstalling client...' }
-            Write-Output $text
+            Write-Host $text
 
             Write-Verbose 'Perform a test on a specific registry key required for ccmsetup to succeed.'
             Test-CCMSetup1
@@ -1784,14 +1822,14 @@ Begin {
                 Write-Verbose 'returning true to tag client for reinstall'
                 $obj = $true
             }
-            #Out-LogFile -Xml $xml -Text $text
+            #Out-LogFile -Text $text
             Write-Output $obj
         }
     }
 
     Function Repair-WMI {
         $text = 'Repairing WMI'
-        Write-Output $text
+        Write-Host $text
 
         # Check PATH
         if ((! (@(($ENV:PATH).Split(';')) -contains "$env:SystemDrive\WINDOWS\System32\Wbem")) -and (! (@(($ENV:PATH).Split(';')) -contains '%systemroot%\System32\Wbem'))) {
@@ -1854,13 +1892,13 @@ Begin {
                 Write-Verbose 'Resending compliance states.'
                 (New-Object -ComObject Microsoft.CCM.UpdatesStore).RefreshServerComplianceState()
                 $LastSent = Get-Date
-                Write-Output 'Compliance States: Refreshed.'
+                Write-Host 'Compliance States: Refreshed.'
             } Catch {
                 Write-Error 'Failed to resend the compliance states.'
                 $LastSent = [datetime]::MinValue
             }
         } Else {
-            Write-Output 'Compliance States: OK.'
+            Write-Host 'Compliance States: OK.'
         }
 
         Set-RegistryValue -Path $RegistryKey -Name $RegValueName -Value $LastSent
@@ -1972,7 +2010,7 @@ Begin {
         Write-Verbose 'Verify startup type'
         if ($serviceStartType -eq $StartupType) {
             $text = "Service $Name startup: OK"
-            Write-Output $text
+            Write-Host $text
         } elseif ($StartupType -like 'Automatic (Delayed Start)') {
             # Handle Automatic Trigger Start the dirty way for these two services. Implement in a nice way in future version.
             if ( (($name -eq 'wuauserv') -or ($name -eq 'W32Time')) -and (($OSName -like 'Windows 10*') -or ($OSName -like '*Server 2016*')) ) {
@@ -1985,7 +2023,7 @@ Begin {
                 # Automatic delayed requires the use of sc.exe
                 & sc.exe config $service start= delayed-auto | Out-Null
                 $text = "Configuring service $Name StartupType to: $StartupType..."
-                Write-Output $text
+                Write-Host $text
                 $log.Services = 'Started'
             }
         }
@@ -1993,7 +2031,7 @@ Begin {
         else {
             try {
                 $text = "Configuring service $Name StartupType to: $StartupType..."
-                Write-Output $text
+                Write-Host $text
                 Set-Service -Name $service.Name -StartupType $StartupType
                 $log.Services = 'Started'
             } catch {
@@ -2005,7 +2043,7 @@ Begin {
         Write-Verbose 'Verify service is running'
         if ($service.Status -eq 'Running') {
             $text = 'Service ' + $Name + ' running: OK'
-            Write-Output $text
+            Write-Host $text
 
             #If we are checking uptime.
             If ($Uptime) {
@@ -2033,20 +2071,22 @@ Begin {
 
                         #If the processes are not running the restart the service.
                         If ($ProcessesStopped) {
-                            Write-Output "Restarting service: $($Name)..."
+                            Write-Host "Restarting service: $($Name)..."
                             Restart-Service -Name $service.Name -Force
-                            Write-Output "Restarted service: $($Name)..."
+                            Write-Host "Restarted service: $($Name)..."
                             $log.Services = 'Restarted'
                         }
                     } catch {
                         $text = "Failed to restart service $($Name)"
                         Write-Error $text
                     }
-                } else {
-                    Write-Output "Service $($Name) uptime: OK"
+                }
+                else {
+                    Write-Host "Service $($Name) uptime: OK"
                 }
             }
-        } else {
+        }
+        else {
             if ($WMIService.Status -eq 'Degraded') {
                 try {
                     Write-Warning "Identified $Name service in a 'Degraded' state. Will force $Name process to stop."
@@ -2060,14 +2100,14 @@ Begin {
             try {
                 $RetryService = $False
                 $text = 'Starting service: ' + $Name + '...'
-                Write-Output $text
+                Write-Host $text
                 Start-Service -Name $service.Name -ErrorAction Stop
                 $log.Services = 'Started'
             } catch {
                 #Error 1290 (-2146233087) indicates that the service is sharing a thread with another service that is protected and cannot share its thread.
                 #This is resolved by configuring the service to run on its own thread.
                 If ($_.Exception.Hresult -eq '-2146233087') {
-                    Write-Output "Failed to start service $Name because it's sharing a thread with another process.  Changing to use its own thread."
+                    Write-Host "Failed to start service $Name because it's sharing a thread with another process.  Changing to use its own thread."
                     & cmd /c sc config $Name type= own
                     $RetryService = $True
                 } Else {
@@ -2098,7 +2138,7 @@ Begin {
 
         if ($share.Name -contains 'ADMIN$') {
             $text = 'Adminshare Admin$: OK'
-            Write-Output $text
+            Write-Host $text
         } else { $fix = $true }
 
         if ($PowerShellVersion -ge 6) { $share = Get-CimInstance Win32_Share | Where-Object { $_.Name -like 'C$' } }
@@ -2107,7 +2147,7 @@ Begin {
 
         if ($share.Name -contains 'C$') {
             $text = 'Adminshare C$: OK'
-            Write-Output $text
+            Write-Host $text
         } else { $fix = $true }
 
         if ($fix -eq $true) {
@@ -2149,7 +2189,7 @@ Begin {
         } else {
             $text = "Free space $env:SystemDrive OK"
             $log.OSDiskFreeSpace = "Free space for $env:SystemDrive is $freespace1 GB - OK"
-            Write-Output $text
+            Write-Host $text
         }
     }
 
@@ -2180,7 +2220,7 @@ Begin {
             $uptime = (Get-Date) - ($wmi.ConvertToDateTime($wmi.lastbootuptime))
             if ($uptime.TotalDays -lt $maxRebootDays) {
                 $text = 'Last boot time: ' + $lastBootTime + ': OK'
-                Write-Output $text
+                Write-Host $text
             } elseif (($uptime.TotalDays -ge $maxRebootDays) -and (Get-XMLConfigRebootApplicationEnable -eq $true)) {
                 $text = 'Last boot time: ' + $lastBootTime + ': More than ' + $maxRebootDays + ' days since last reboot. Starting reboot application.'
                 Write-Warning $text
@@ -2255,11 +2295,11 @@ Begin {
             foreach ($device in $devices) {
                 $text = 'Missing or faulty driver: ' + $device.Name + '. Device ID: ' + $device.DeviceID
                 Write-Warning $text
-                if (-NOT($FileLogLevel -like 'clientlocal')) { Out-LogFile -Xml $xml -Text $text -Severity 2 }
+                if (-NOT($FileLogLevel -like 'clientlocal')) { Out-LogFile -Text $text -Severity 2 }
             }
         } else {
             $text = 'Drivers: OK'
-            Write-Output $text
+            Write-Host $text
             $log.Drivers = 'OK'
         }
     }
@@ -2314,7 +2354,7 @@ Begin {
 
         } else {
             $text = 'ConfigMgr Hardware Inventory scan: OK'
-            Write-Output $text
+            Write-Host $text
         }
         $log.HWInventory = $HWScanDate
         Write-Verbose 'End Test-SCCMHardwareInventoryScan'
@@ -2442,8 +2482,8 @@ Begin {
 
     Function Get-Version {
         $text = 'ConfigMgr Client Health Version ' + $Version
-        Write-Output $text
-        Out-LogFile -Xml $xml -Text $text -Severity 1
+        Write-Host $text
+        Out-LogFile -Text $text -Severity 1
     }
 
     <# Trigger codes
@@ -2515,7 +2555,7 @@ Begin {
         } catch {
             $text = "Error connecting to SQLDatabase $Database on SQL Server $SQLServer"
             Write-Error -Message $text
-            if (-NOT($FileLogLevel -like 'clientinstall')) { Out-LogFile -Xml $xml -Text $text -Severity 3 }
+            if (-NOT($FileLogLevel -like 'clientinstall')) { Out-LogFile -Text $text -Severity 3 }
             $obj = $false
             Write-Verbose 'SQL connection test failed'
         } finally { Write-Output $obj }
@@ -2994,29 +3034,29 @@ Begin {
         $info = Get-Info | Select-Object HostName, OperatingSystem, Architecture, Build, InstallDate, Manufacturer, Model, LastLoggedOnUser
         #$text = 'Computer info'+ "`n"
         $text = 'Hostname: ' + $info.HostName
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'Operatingsystem: ' + $info.OperatingSystem
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'Architecture: ' + $info.Architecture
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'Build: ' + $info.Build
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'Manufacturer: ' + $info.Manufacturer
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'Model: ' + $info.Model
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'InstallDate: ' + $info.InstallDate
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
         $text = 'LastLoggedOnUser: ' + $info.LastLoggedOnUser
-        Write-Output $text
-        #Out-LogFile -Xml $xml $text
+        Write-Host $text
+        #Out-LogFile $text
     }
 
     Function Test-ConfigMgrHealthLogging {
@@ -3245,7 +3285,7 @@ Begin {
             $ErrorMessage = $_.Exception.Message
             $text = "Error updating SQL with the following query: $query. Error: $ErrorMessage"
             Write-Error $text
-            Out-LogFile -Xml $Xml -Text "ERROR Insert/Update SQL. SQL Query: $query `nSQL Error: $ErrorMessage" -Severity 3
+            Out-LogFile -Text "ERROR Insert/Update SQL. SQL Query: $query `nSQL Error: $ErrorMessage" -Severity 3
         }
         Write-Verbose 'End Update-SQL'
     }
@@ -3262,17 +3302,13 @@ Begin {
         Test-ValuesBeforeLogUpdate
         $logfile = $logfile = Get-LogFileName
         Test-LogFileHistory -Logfile $logfile
-        $text = '<--- ConfigMgr Client Health Check starting --->'
-        $text += $log | Select-Object Hostname, Operatingsystem, Architecture, Build, Model, InstallDate, OSUpdates, LastLoggedOnUser, ClientVersion, PSVersion, PSBuild, SiteCode, Domain, MaxLogSize, MaxLogHistory, CacheSize, Certificate, ProvisioningMode, DNS, PendingReboot, LastBootTime, OSDiskFreeSpace, Services, AdminShare, StateMessages, WUAHandler, WMI, RefreshComplianceState, ClientInstalled, Version, Timestamp, HWInventory, SWMetering, BITS, ClientSettings, PatchLevel, ClientInstalledReason | Out-String
-        $text = $text.replace("`t", '')
-        $text = $text.replace('  ', '')
-        $text = $text.replace(' :', ':')
-        $text = $text -creplace '(?m)^\s*\r?\n', ''
+        $text = $log | Select-Object Hostname, Operatingsystem, Architecture, Build, Model, InstallDate, OSUpdates, LastLoggedOnUser, ClientVersion, PSVersion, PSBuild, SiteCode, Domain, MaxLogSize, MaxLogHistory, CacheSize, Certificate, ProvisioningMode, DNS, PendingReboot, LastBootTime, OSDiskFreeSpace, Services, AdminShare, StateMessages, WUAHandler, WMI, RefreshComplianceState, ClientInstalled, Version, Timestamp, HWInventory, SWMetering, BITS, ClientSettings, PatchLevel, ClientInstalledReason | Out-String        $text = $text.replace("`t","")
+        $text = $text.replace("  ","")
+        $text = $text.replace(" :",":")
+        $text = $text -creplace '(?m)^\s*\r?\n',''
 
-        if ($Mode -eq 'Local') { Out-LogFile -Xml $xml -Text $text -Mode $Mode -Severity 1 }
-        elseif ($Mode -eq 'ClientInstalledFailed') { Out-LogFile -Xml $xml -Text $text -Mode $Mode -Severity 1 }
-        else { Out-LogFile -Xml $xml -Text $text -Severity 1 }
-        Write-Verbose 'End Update-LogFile'
+        Out-LogFile -Text $text -Mode $Mode -Severity 1
+        Write-Verbose "End Update-LogFile"
     }
 
     # Write-Log : CMTrace compatible log file
@@ -3304,6 +3340,11 @@ Begin {
         $ClientStateMessages = Get-XMLConfigRemediationClientStateMessages
         $ClientWUAHandler = Get-XMLConfigRemediationClientWUAHandler
         $LogShare = Get-XMLConfigLoggingShare
+
+        $LocalLogging = ((Get-XMLConfigLoggingLocalFile).ToString()).ToLower()
+        $FileLogging = ((Get-XMLConfigLoggingEnable).ToString()).ToLower()
+        $FileLogLevel = ((Get-XMLConfigLoggingLevel).ToString()).ToLower()
+        $SQLLogging = ((Get-XMLConfigSQLLoggingEnable).ToString()).ToLower()
     }
 
     # Create a DataTable to store all changes to log files to be processed later. This to prevent false positives to remediate the next time script runs if error is already remediated.
@@ -3318,7 +3359,7 @@ Process {
     # Veriy script is running with administrative priveleges.
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] 'Administrator')) {
         $text = 'ERROR: Powershell not running as Administrator! Client Health aborting.'
-        Out-LogFile -Xml $Xml -Text $text -Severity 3
+        Out-LogFile -Text $text -Severity 3
         Write-Error $text
         Exit 1
     } else {
@@ -3343,12 +3384,6 @@ Process {
     }
 
 
-    # If config.xml is used
-    $LocalLogging = ((Get-XMLConfigLoggingLocalFile).ToString()).ToLower()
-    $FileLogging = ((Get-XMLConfigLoggingEnable).ToString()).ToLower()
-    $FileLogLevel = ((Get-XMLConfigLoggingLevel).ToString()).ToLower()
-    $SQLLogging = ((Get-XMLConfigSQLLoggingEnable).ToString()).ToLower()
-
 
     $RegistryKey = 'HKLM:\Software\ConfigMgrClientHealth'
     $LastRunRegistryValueName = 'LastRun'
@@ -3356,7 +3391,7 @@ Process {
     #Get the last run from the registry, defaulting to the minimum date value if the script has never ran.
     try { [datetime]$LastRun = Get-RegistryValue -Path $RegistryKey -Name $LastRunRegistryValueName }
     catch { $LastRun = [datetime]::MinValue }
-    Write-Output "Script last ran: $($LastRun)"
+    Write-Host "Script last ran: $($LastRun)"
 
     Write-Verbose 'Testing if log files are bigger than max history for logfiles.'
     Test-ConfigMgrHealthLogging
@@ -3508,7 +3543,7 @@ Process {
 
     # Restart ConfigMgr client if tagged for restart and no reinstall tag
     if (($restartCCMExec -eq $true) -and ($Reinstall -eq $false)) {
-        Write-Output 'Restarting service CcmExec...'
+        Write-Host 'Restarting service CcmExec...'
 
         if ($SCCMLogJobs.Rows.Count -ge 1) {
             Stop-Service -Name CcmExec
@@ -3576,26 +3611,26 @@ End {
     #Set the last run.
     $Date = Get-Date
     Set-RegistryValue -Path $RegistryKey -Name $LastRunRegistryValueName -Value $Date
-    Write-Output "Setting last ran to $($Date)"
+    Write-Host "Setting last ran to $($Date)"
 
     if ($LocalLogging -like 'true') {
-        Write-Output 'Updating local logfile with results'
+        Write-Host 'Updating local logfile with results'
         Update-LogFile -Log $log -Mode 'Local'
     }
 
     if (($FileLogging -like 'true') -and ($FileLogLevel -like 'full')) {
-        Write-Output 'Updating fileshare logfile with results'
+        Write-Host 'Updating fileshare logfile with results'
         Update-LogFile -Log $log
     }
 
     if (($SQLLogging -eq 'true') -and -not $PSBoundParameters.ContainsKey('Webservice')) {
-        Write-Output 'Updating SQL database with results'
+        Write-Host 'Updating SQL database with results'
         Update-SQL -Log $log
     }
 
     if ($PSBoundParameters.ContainsKey('Webservice')) {
-        Write-Output 'Updating SQL database with results using webservice'
+        Write-Host 'Updating SQL database with results using webservice'
         Update-Webservice -URI $Webservice -Log $Log
     }
-    Write-Verbose 'Client Health script finished'
+    Write-Host 'Client Health script finished'
 }
