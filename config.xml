@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Configuration>
-	<LocalFiles>C:\Temp\ClientHealth</LocalFiles> <!-- Path locally on computer for temporary files and local clienthealth.log if LocalLogFile="True" -->
+	<LocalFiles>C:\Temp\ConfigMgrClientHealth</LocalFiles> <!-- Path locally on computer for temporary files and local clienthealth.log if LocalLogFile="True" -->
 	<Client Name="Version">5.00.9106.1000</Client>
 	<Client Name="SiteCode">UP1</Client>
 	<Client Name="Domain">COMPANY.com</Client>
@@ -9,22 +9,23 @@
 	<Client Name="CacheSize" Value="5120" DeleteOrphanedData="True" Enable="True" />
 	<Client Name="Log" MaxLogSize="4096" MaxLogHistory="2" Enable="True" />
 	<ClientInstallProperty>SMSSITECODE=UP1</ClientInstallProperty>
+	<ClientInstallProperty>MP=DC-MECM1.COMPANY.com</ClientInstallProperty>
 	<ClientInstallProperty>/MP:DC-MECM1.COMPANY.com</ClientInstallProperty>
 	<Log Name="File" Share="\\DC-FS2\Logs$\MECM" Level="Full" MaxLogHistory="8" LocalLogFile="True" Enable="True" /> <!-- Level: Full = everything. ClientInstall = only if installation of sccm agent fails.  -->
 	<Log Name="SQL" Server="DC-SQLAPP6.COMPANY.com" Enable="False" />
 	<Log Name="Time" Format="ClientLocal" /> <!-- Valid formats: ClientLocal / UTC  -->
-	<Option Name="CcmSQLCELog" Enable="False" /> <!-- Optional check on the ConfigMgr agent if local database is corrupt -->
+	<Option Name="CcmSQLCELog" Enable="True" /> <!-- Optional check on the ConfigMgr agent if local database is corrupt -->
 	<Option Name="BITSCheck" Fix="True" Enable="True" />
 	<Option Name="ClientSettingsCheck" Fix="True" Enable="True" />
 	<Option Name="DNSCheck" Fix="True" Enable="True" />
 	<Option Name="Drivers" Enable="True" />
 	<Option Name="Updates" Share="\\COMPANY\software_distribution$\ConfigMgrSource\WindowsUpdates" Fix="True" Enable="False" />
 	<Option Name="PendingReboot" StartRebootApplication="False" Enable="True" />
-	<Option Name="RebootApplication" Application="C:\Windows\System32\shutdown.exe /t:7200" Enable="False" />
+	<Option Name="RebootApplication" Application="" Enable="False" />
 	<Option Name="MaxRebootDays" Days="7" Enable="True" />
-	<Option Name="OSDiskFreeSpace">10</Option>
-	<Option Name="HardwareInventory" Days="10" Fix="True" Enable="True" />
-	<Option Name="SoftwareMetering" Fix="True" Enable="True" />
+	<Option Name="OSDiskFreeSpace">30</Option>
+	<Option Name="HardwareInventory" Days="7" Fix="True" Enable="True" />
+	<Option Name="SoftwareMetering" Fix="False" Enable="True" />
 	<Option Name="WMI" Fix="True" Enable="True"/>
 	<Option Name="RefreshComplianceState" Days="30" Enable="True"/>
 	<Service Name="BITS" StartupType="Automatic (Delayed Start)" State="Running" Uptime=""/>
@@ -33,10 +34,10 @@
 	<Service Name="lanmanserver" StartupType="Automatic" State="Running" Uptime=""/>
 	<Service Name="RpcSs" StartupType="Automatic" State="Running" Uptime=""/>
 	<Service Name="W32Time" StartupType="Automatic" State="Running" Uptime=""/>
-	<Service Name="ccmexec" StartupType="Automatic (Delayed Start)" State="Running" Uptime="" />
+	<Service Name="ccmexec" StartupType="Automatic (Delayed Start)" State="Running" Uptime="7" />
 	<Remediation Name="AdminShare" Fix="True" />
 	<Remediation Name="ClientProvisioningMode" Fix="True" />
 	<Remediation Name="ClientStateMessages" Fix="True" />
-	<Remediation Name="ClientWUAHandler" Fix="True"  Days="30"/>
+	<Remediation Name="ClientWUAHandler" Fix="True"  Days=""/>
 	<Remediation Name="ClientCertificate" Fix="True" />
 </Configuration>
